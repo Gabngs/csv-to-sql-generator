@@ -23,10 +23,7 @@ Todos los cambios notables en este proyecto se documentarán en este archivo.
 - Tabla: `catalogo_tiposgasto`
 
 ## Roadmap futuro
-
-- [ ] Agregar más tablas de catálogo
 - [ ] Interfaz para configurar campos dinámicamente
 - [ ] Validación de datos antes de generar INSERTs
 - [ ] Vista previa de datos
 - [ ] Soporte para otras bases de datos (PostgreSQL, SQLite)
-- [ ] Tests automatizados

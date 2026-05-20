@@ -27,7 +27,7 @@ Herramienta visual para convertir archivos CSV en sentencias SQL `INSERT` para M
 
 1. **Clonar o descargar el repositorio**
 ```bash
-git clone <tu-repo>
+git clone https://github.com/Gabngs/csv-to-sql-generator.git
 cd csv-to-sql-generator
 ```
 

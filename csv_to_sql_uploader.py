@@ -215,25 +215,25 @@ while True:
         output = ""
         
         if errores:
-            output += "⚠️  ERRORES:\n"
+            output += "-- ⚠️  ERRORES:\n"
             for error in errores:
-                output += f"{error}\n"
-            output += "\n" + "=" * 70 + "\n\n"
+                output += f"-- {error}\n"
+            output += "\n-- " + "=" * 70 + "\n\n"
         
         if inserts_generados:
-            output += "✓ INSERTS GENERADOS:\n"
-            output += "=" * 70 + "\n\n"
+            output += "-- ✓ INSERTS GENERADOS:\n"
+            output += "-- " + "=" * 70 + "\n\n"
             
             total_inserts = 0
             for item in inserts_generados:
-                output += f"📁 {item['archivo']} → {item['tabla']}\n"
-                output += f"   Registros: {item['cantidad']}\n"
-                output += "-" * 70 + "\n"
+                output += f"-- 📁 {item['archivo']} → {item['tabla']}\n"
+                output += f"--    Registros: {item['cantidad']}\n"
+                output += "-- " + "-" * 70 + "\n"
                 output += "\n".join(item['inserts'])
                 output += "\n\n"
                 total_inserts += item['cantidad']
             
-            output = f"TOTAL: {total_inserts} INSERT(s) generados\n\n" + output
+            output = f"-- TOTAL: {total_inserts} INSERT(s) generados\n\n" + output
         
         window['-OUTPUT-'].update(output)
         window['-STATUS-'].update(f'✓ Procesado: {sum(item["cantidad"] for item in inserts_generados)} registros')

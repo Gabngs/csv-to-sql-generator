@@ -265,8 +265,9 @@ while True:
     if event == sg.WINDOW_CLOSED or event == 'Salir':
         break
 
-    if values['-FILES-']:
-        archivos_seleccionados = values['-FILES-'].split(';')
+    files_val = values.get('-FILES-', '')
+    if files_val and ('\\' in files_val or '/' in files_val or ':' in files_val):
+        archivos_seleccionados = files_val.split(';')
         archivos_seleccionados = [f.strip() for f in archivos_seleccionados if f.strip()]
         config_campos_global = {}
         cantidad = len(archivos_seleccionados)

@@ -1,6 +1,5 @@
 import PySimpleGUI as sg
 import csv
-import uuid
 from datetime import datetime
 from pathlib import Path
 import os
@@ -57,8 +56,7 @@ def generar_insert(tabla, headers, fila):
         if col in fila:
             valores_csv[col] = fila[col]
     
-    # Generar valores del sistema
-    id_uuid = str(uuid.uuid4())
+    # Generar timestamp actual
     ahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     # Construir lista de columnas y valores
@@ -83,7 +81,7 @@ def generar_insert(tabla, headers, fila):
     
     # Agregar columnas del sistema
     todas_columnas.extend(['id', 'created_by_id', 'updated_by_id', 'created_at', 'updated_at'])
-    todos_valores.extend([f"'{id_uuid}'", '184', '184', f"'{ahora}'", f"'{ahora}'"])
+    todos_valores.extend(['UUID()', '184', '184', f"'{ahora}'", f"'{ahora}'"])
     
     # Construir INSERT
     columnas_str = ', '.join(todas_columnas)

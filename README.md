@@ -168,7 +168,7 @@ CREATE TABLE catalogo_clasesgasto (
    - Toma los valores del CSV
    - Usa la función `UUID()` de MySQL para generar el `id` automáticamente
    - Usa timestamp actual para `created_at` y `updated_at`
-   - Asigna `created_by_id` y `updated_by_id` a 184
+   - Asigna `created_by_id` y `updated_by_id` a 999 -- valor editable --
    - Genera la sentencia INSERT
 
 4. **Escapea valores** para evitar problemas con caracteres especiales
@@ -197,7 +197,8 @@ Este proyecto está disponible bajo la licencia MIT.
 
 ## 👨‍💻 Autor
 
-Creado con Python y PySimpleGUI
+Creado con Python y PySimpleGUI 
+By GabNgs ( Neo )
 
 ## 🤝 Contribuciones
 

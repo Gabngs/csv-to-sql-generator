@@ -136,17 +136,17 @@ def procesar_archivos(filepaths):
 
 layout = [
     [sg.Text('CSV to SQL Insert Generator', font=('Arial', 16, 'bold'))],
-    [sg.Text('Arrastra archivos CSV o selecciona múltiples archivos', font=('Arial', 10))],
+    [sg.Text('Selecciona múltiples archivos CSV para convertir a SQL INSERT', font=('Arial', 10))],
     [sg.Text('_' * 60)],
     
-    # Área de arrastrar archivos
+    # Área de selección de archivos
     [sg.InputText(
-        'Arrastra archivos CSV aquí o haz clic para seleccionar',
+        'Haz clic en Seleccionar para elegir archivos CSV',
         key='-FILES-',
         disabled=True,
         size=(50, 1)
     ),
-    sg.FilesBrowse('Seleccionar', file_types=(('CSV Files', '*.csv'), ('All Files', '*.*')))],
+    sg.FilesBrowse('Seleccionar', file_types=(('CSV Files', '*.csv'), ('All Files', '*.*')), enable_events=True)],
     
     [sg.Text('_' * 60)],
     
@@ -183,9 +183,6 @@ window = sg.Window(
     icon=None
 )
 
-# Habilitar drag & drop
-window['-FILES-'].drag_types[0] = 'files'
-
 # Variables globales
 archivos_seleccionados = []
 inserts_generados = []
@@ -197,16 +194,15 @@ while True:
     if event == sg.WINDOW_CLOSED or event == 'Salir':
         break
     
-    elif event == '-FILES-':
-        # Cuando se arrastra archivos o se seleccionan
-        if values['-FILES-']:
-            archivos_seleccionados = values['-FILES-'].split(';')
-            archivos_seleccionados = [f.strip() for f in archivos_seleccionados if f.strip()]
-            cantidad = len(archivos_seleccionados)
-            window['-STATUS-'].update(f'✓ {cantidad} archivo(s) seleccionado(s)')
-            window['-FILES-'].update(f'{cantidad} archivo(s) seleccionado(s)')
+    # Cuando se seleccionan archivos
+    if values['-FILES-']:
+        archivos_seleccionados = values['-FILES-'].split(';')
+        archivos_seleccionados = [f.strip() for f in archivos_seleccionados if f.strip()]
+        cantidad = len(archivos_seleccionados)
+        window['-STATUS-'].update(f'✓ {cantidad} archivo(s) seleccionado(s)')
+        window['-FILES-'].update(f'{cantidad} archivo(s) seleccionado(s)')
     
-    elif event == 'Procesar Archivos':
+    if event == 'Procesar Archivos':
         if not archivos_seleccionados:
             sg.popup_error('Selecciona archivos CSV primero')
             continue
@@ -244,7 +240,7 @@ while True:
         window['-OUTPUT-'].update(output)
         window['-STATUS-'].update(f'✓ Procesado: {sum(item["cantidad"] for item in inserts_generados)} registros')
     
-    elif event == 'Copiar al Portapapeles':
+    if event == 'Copiar al Portapapeles':
         texto = window['-OUTPUT-'].get()
         if texto:
             window.TKroot.clipboard_clear()
@@ -253,7 +249,7 @@ while True:
         else:
             sg.popup_error('No hay contenido para copiar')
     
-    elif event == 'Guardar en Archivo':
+    if event == 'Guardar en Archivo':
         texto = window['-OUTPUT-'].get()
         if not texto:
             sg.popup_error('No hay contenido para guardar')
@@ -275,9 +271,9 @@ while True:
             except Exception as e:
                 sg.popup_error(f'Error al guardar: {str(e)}')
     
-    elif event == 'Limpiar':
+    if event == 'Limpiar':
         window['-OUTPUT-'].update('')
-        window['-FILES-'].update('Arrastra archivos CSV aquí o haz clic para seleccionar')
+        window['-FILES-'].update('Haz clic en Seleccionar para elegir archivos CSV')
         archivos_seleccionados = []
         inserts_generados = []
         window['-STATUS-'].update('Listo')

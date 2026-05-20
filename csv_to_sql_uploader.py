@@ -179,7 +179,6 @@ window = sg.Window(
     'CSV to SQL Insert Generator',
     layout,
     finalize=True,
-    enable_events=True,
     size=(750, 700),
     icon=None
 )

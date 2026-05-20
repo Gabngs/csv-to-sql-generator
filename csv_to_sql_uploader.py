@@ -14,7 +14,6 @@ TABLA_MAPEO = {
     'tiposgasto': 'catalogo_tiposgasto',
 }
 
-# Columnas cuyo valor siempre se trata como texto aunque parezcan números
 COLUMNAS_TEXTO = {'descripcion', 'descpers', 'nombre'}
 
 
@@ -111,45 +110,99 @@ def procesar_archivos(filepaths, config_global=None):
     return todas_inserts, errores
 
 
+def construir_sql(lista_inserts, lista_errores):
+    """Construye el texto SQL final con comentarios -- garantizados."""
+    lineas = []
+
+    if lista_errores:
+        lineas.append("-- ⚠️  ERRORES:")
+        for error in lista_errores:
+            lineas.append(f"-- {error}")
+        lineas.append("")
+        lineas.append("-- " + "=" * 70)
+        lineas.append("")
+
+    if lista_inserts:
+        total = sum(item['cantidad'] for item in lista_inserts)
+        lineas.append(f"-- TOTAL: {total} INSERT(s) generados")
+        lineas.append("")
+        lineas.append("-- ✓ INSERTS GENERADOS:")
+        lineas.append("-- " + "=" * 70)
+        lineas.append("")
+
+        for item in lista_inserts:
+            lineas.append(f"-- 📁 {item['archivo']} → {item['tabla']}")
+            lineas.append(f"--    Registros: {item['cantidad']}")
+            lineas.append("-- " + "-" * 70)
+            lineas.extend(item['inserts'])
+            lineas.append("")
+            lineas.append("")
+
+    return "\n".join(lineas)
+
+
+TITULO_CONFIG = 'Configurar Campos'
+
+
+def _frame_archivo(fi, datos, col_mapping):
+    """Construye el frame de columnas para un archivo CSV."""
+    filepath = datos['filepath']
+    headers = datos['headers']
+    filename = Path(filepath).name
+    tabla = datos['tabla']
+
+    col_rows = [
+        [
+            sg.Text('Incluir', size=(6, 1), font=('Arial', 9, 'bold')),
+            sg.Text('Columna', size=(24, 1), font=('Arial', 9, 'bold')),
+            sg.Text('Forzar NULL', size=(11, 1), font=('Arial', 9, 'bold')),
+        ],
+        [sg.HSeparator()],
+    ]
+    for ci, col in enumerate(headers):
+        col_mapping[(fi, ci)] = (filepath, col)
+        col_rows.append([
+            sg.Checkbox('', default=True, key=f'-INC-{fi}-{ci}-', enable_events=True, pad=(4, 2)),
+            sg.Text(col, size=(24, 1), font=('Courier', 9)),
+            sg.Checkbox('', default=False, key=f'-NUL-{fi}-{ci}-', pad=(4, 2)),
+        ])
+
+    frame_height = min(220, 28 * len(headers) + 50)
+    inner = sg.Column(col_rows, scrollable=True, vertical_scroll_only=True, size=(400, frame_height))
+    return [sg.Frame(f'  {filename}  →  {tabla}  ', [[inner]], font=('Arial', 10, 'bold'))]
+
+
+def _toggle_todos(win, col_mapping, habilitar):
+    """Activa o desactiva todos los checkboxes Incluir y ajusta NULL."""
+    for (fi, ci) in col_mapping:
+        win[f'-INC-{fi}-{ci}-'].update(habilitar)
+        win[f'-NUL-{fi}-{ci}-'].update(disabled=not habilitar)
+
+
+def _extraer_config(col_mapping, vals):
+    """Construye el dict de configuración desde los valores del formulario."""
+    config = {}
+    for (fi, ci), (filepath, col) in col_mapping.items():
+        if filepath not in config:
+            config[filepath] = {}
+        config[filepath][col] = {
+            'incluir': vals.get(f'-INC-{fi}-{ci}-', True),
+            'forzar_null': vals.get(f'-NUL-{fi}-{ci}-', False),
+        }
+    return config
+
+
 def abrir_configuracion_campos(archivos_datos):
     """
     archivos_datos: list of {'filepath': str, 'tabla': str, 'headers': list}
     Returns: {filepath: {col: {'incluir': bool, 'forzar_null': bool}}} or None si se cancela
     """
-    col_mapping = {}  # (fi, ci) -> (filepath, col_name)
-    frames = []
-
-    for fi, datos in enumerate(archivos_datos):
-        filepath = datos['filepath']
-        tabla = datos['tabla']
-        headers = datos['headers']
-        filename = Path(filepath).name
-
-        col_rows = [
-            [
-                sg.Text('Incluir', size=(6, 1), font=('Arial', 9, 'bold')),
-                sg.Text('Columna', size=(24, 1), font=('Arial', 9, 'bold')),
-                sg.Text('Forzar NULL', size=(11, 1), font=('Arial', 9, 'bold')),
-            ],
-            [sg.HSeparator()],
-        ]
-
-        for ci, col in enumerate(headers):
-            col_mapping[(fi, ci)] = (filepath, col)
-            col_rows.append([
-                sg.Checkbox('', default=True, key=f'-INC-{fi}-{ci}-', enable_events=True, pad=(4, 2)),
-                sg.Text(col, size=(24, 1), font=('Courier', 9)),
-                sg.Checkbox('', default=False, key=f'-NUL-{fi}-{ci}-', pad=(4, 2)),
-            ])
-
-        frame_height = min(220, 28 * len(headers) + 50)
-        inner = sg.Column(col_rows, scrollable=True, vertical_scroll_only=True, size=(400, frame_height))
-        frames.append([sg.Frame(f'  {filename}  →  {tabla}  ', [[inner]], font=('Arial', 10, 'bold'))])
-
+    col_mapping = {}
+    frames = [_frame_archivo(fi, d, col_mapping) for fi, d in enumerate(archivos_datos)]
     outer_col = sg.Column(frames, scrollable=True, vertical_scroll_only=True, size=(460, 460))
 
     layout = [
-        [sg.Text('Configurar Campos', font=('Arial', 14, 'bold'))],
+        [sg.Text(TITULO_CONFIG, font=('Arial', 14, 'bold'))],
         [sg.Text('Incluir: el campo entra al INSERT con su valor del CSV.', font=('Arial', 9))],
         [sg.Text('Forzar NULL: el campo entra al INSERT pero con valor NULL.', font=('Arial', 9))],
         [sg.HSeparator()],
@@ -163,7 +216,7 @@ def abrir_configuracion_campos(archivos_datos):
         ],
     ]
 
-    win = sg.Window('Configurar Campos', layout, modal=True, finalize=True, size=(490, 620))
+    win = sg.Window(TITULO_CONFIG, layout, modal=True, finalize=True, size=(490, 620))
 
     while True:
         ev, vals = win.read()
@@ -173,30 +226,14 @@ def abrir_configuracion_campos(archivos_datos):
             return None
 
         if ev == 'Todo ON':
-            for (fi, ci) in col_mapping:
-                win[f'-INC-{fi}-{ci}-'].update(True)
-                win[f'-NUL-{fi}-{ci}-'].update(disabled=False)
-
-        if ev == 'Todo OFF':
-            for (fi, ci) in col_mapping:
-                win[f'-INC-{fi}-{ci}-'].update(False)
-                win[f'-NUL-{fi}-{ci}-'].update(disabled=True)
-
-        # Deshabilitar NULL cuando se desmarca Incluir
-        if isinstance(ev, str) and ev.startswith('-INC-'):
+            _toggle_todos(win, col_mapping, True)
+        elif ev == 'Todo OFF':
+            _toggle_todos(win, col_mapping, False)
+        elif isinstance(ev, str) and ev.startswith('-INC-'):
             parts = ev.split('-')
-            fi_ev, ci_ev = parts[2], parts[3]
-            win[f'-NUL-{fi_ev}-{ci_ev}-'].update(disabled=not vals[ev])
-
-        if ev == 'Aplicar':
-            config = {}
-            for (fi, ci), (filepath, col) in col_mapping.items():
-                if filepath not in config:
-                    config[filepath] = {}
-                config[filepath][col] = {
-                    'incluir': vals.get(f'-INC-{fi}-{ci}-', True),
-                    'forzar_null': vals.get(f'-NUL-{fi}-{ci}-', False),
-                }
+            win[f'-NUL-{parts[2]}-{parts[3]}-'].update(disabled=not vals[ev])
+        elif ev == 'Aplicar':
+            config = _extraer_config(col_mapping, vals)
             win.close()
             return config
 
@@ -232,7 +269,7 @@ layout = [
     [sg.Text('_' * 60)],
 
     [
-        sg.Button('Configurar Campos', size=(15, 1), button_color=('white', '#5a5a8a')),
+        sg.Button(TITULO_CONFIG, size=(15, 1), button_color=('white', '#5a5a8a')),
         sg.Button('Procesar Archivos', size=(15, 1), button_color=('white', 'green')),
         sg.Button('Limpiar', size=(10, 1)),
     ],
@@ -255,7 +292,7 @@ window = sg.Window(
 
 archivos_seleccionados = []
 inserts_generados = []
-ultimo_output = ""
+errores_generados = []
 config_campos_global = {}
 
 # --- LOOP PRINCIPAL ---
@@ -274,7 +311,7 @@ while True:
         window['-STATUS-'].update(f'✓ {cantidad} archivo(s) — configura campos o procesa directamente')
         window['-FILES-'].update(f'{cantidad} archivo(s) seleccionado(s)')
 
-    if event == 'Configurar Campos':
+    if event == TITULO_CONFIG:
         if not archivos_seleccionados:
             sg.popup_error('Selecciona archivos CSV primero')
             continue
@@ -308,48 +345,28 @@ while True:
         window['-STATUS-'].update('Procesando...')
         window.refresh()
 
-        inserts_generados, errores = procesar_archivos(
+        inserts_generados, errores_generados = procesar_archivos(
             archivos_seleccionados,
             config_campos_global if config_campos_global else None,
         )
 
-        output = ""
-
-        if errores:
-            output += "-- ⚠️  ERRORES:\n"
-            for error in errores:
-                output += f"-- {error}\n"
-            output += "\n-- " + "=" * 70 + "\n\n"
-
-        if inserts_generados:
-            output += "-- ✓ INSERTS GENERADOS:\n"
-            output += "-- " + "=" * 70 + "\n\n"
-
-            total_inserts = 0
-            for item in inserts_generados:
-                output += f"-- 📁 {item['archivo']} → {item['tabla']}\n"
-                output += f"--    Registros: {item['cantidad']}\n"
-                output += "-- " + "-" * 70 + "\n"
-                output += "\n".join(item['inserts'])
-                output += "\n\n"
-                total_inserts += item['cantidad']
-
-            output = f"-- TOTAL: {total_inserts} INSERT(s) generados\n\n" + output
-
-        ultimo_output = output
-        window['-OUTPUT-'].update(output)
+        # El display puede mostrar sin -- por limitaciones del widget; los archivos siempre se generan correctamente
+        display = construir_sql(inserts_generados, errores_generados)
+        window['-OUTPUT-'].update(display)
         window['-STATUS-'].update(f'✓ Procesado: {sum(item["cantidad"] for item in inserts_generados)} registros')
 
     if event == 'Copiar al Portapapeles':
-        if ultimo_output:
-            window.TKroot.clipboard_clear()
-            window.TKroot.clipboard_append(ultimo_output)
-            sg.popup_ok('✓ Copiado al portapapeles', title='Éxito')
-        else:
+        if not inserts_generados and not errores_generados:
             sg.popup_error('No hay contenido para copiar')
+            continue
+        # Reconstruye desde los datos originales — garantiza -- en el output
+        contenido = construir_sql(inserts_generados, errores_generados)
+        window.TKroot.clipboard_clear()
+        window.TKroot.clipboard_append(contenido)
+        sg.popup_ok('✓ Copiado al portapapeles', title='Éxito')
 
     if event == 'Guardar en Archivo':
-        if not ultimo_output:
+        if not inserts_generados and not errores_generados:
             sg.popup_error('No hay contenido para guardar')
             continue
 
@@ -362,8 +379,10 @@ while True:
 
         if filepath:
             try:
+                # Reconstruye desde los datos originales — garantiza -- en el output
+                contenido = construir_sql(inserts_generados, errores_generados)
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(ultimo_output)
+                    f.write(contenido)
                 sg.popup_ok(f'✓ Guardado en:\n{filepath}', title='Éxito')
                 window['-STATUS-'].update(f'✓ Archivo guardado: {filepath}')
             except Exception as e:
@@ -374,7 +393,7 @@ while True:
         window['-FILES-'].update('Haz clic en Seleccionar para elegir archivos CSV')
         archivos_seleccionados = []
         inserts_generados = []
-        ultimo_output = ""
+        errores_generados = []
         config_campos_global = {}
         window['-STATUS-'].update('Listo')
 

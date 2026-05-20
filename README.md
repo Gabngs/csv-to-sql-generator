@@ -66,8 +66,10 @@ python csv_to_sql_uploader.py
 
 3. **Usar los resultados**:
    - **Copiar al portapapeles**: Copia todos los INSERTs para pegarlos en tu cliente SQL
-   - **Guardar en archivo**: Guarda los INSERTs en un archivo .sql
+   - **Guardar en archivo**: Guarda los INSERTs en un archivo .sql con comentarios informativos (total de registros, tabla, archivo origen)
    - **Limpiar**: Limpia la salida para procesar nuevos archivos
+
+**Nota:** Los comentarios en el archivo SQL incluyen información útil como el total de registros, nombre de archivo y tabla. Todos los comentarios usan `--` (estándar SQL) por lo que el archivo es ejecutable directamente en MySQL.
 
 ## 📁 Nombres de archivos esperados
 
@@ -197,7 +199,7 @@ Este proyecto está disponible bajo la licencia MIT.
 
 ## 👨‍💻 Autor
 
-Creado con Python y PySimpleGUI 
+Creado con Python y PySimpleGUI
 By GabNgs ( Neo )
 
 ## 🤝 Contribuciones

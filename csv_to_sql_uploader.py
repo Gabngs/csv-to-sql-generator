@@ -17,24 +17,14 @@ TABLA_MAPEO = {
     'tiposgasto': 'catalogo_tiposgasto',
 }
 
-# Columnas especiales por tabla (las que vienen del CSV)
-COLUMNAS_CSV = {
-    'catalogo_clasesgasto': ['idclasesgasto', 'descripcion', 'activo', 'enviado'],
-    'catalogo_grupogasto': ['idgrupogasto', 'descripcion', 'activo', 'enviado'],
-    'catalogo_motivosgasto': ['idmotivosgasto', 'descripcion', 'activo', 'enviado'],
-    'catalogo_motivostipogasto': ['idmotivosgasto', 'idtipogasto', 'activo'],
-    'catalogo_tiposgasto': ['idtipogasto', 'descripcion', 'activo', 'enviado'],
-}
-
-COLUMNAS_SISTEMA = ['id', 'created_by_id', 'updated_by_id', 'created_at', 'updated_at']
+# Columnas cuyo valor siempre se trata como texto (aunque parezcan números)
+COLUMNAS_TEXTO = {'descripcion', 'descpers', 'nombre'}
 
 def obtener_nombre_tabla(filename):
-    """Obtiene el nombre de tabla basado en el nombre del archivo"""
     nombre_base = Path(filename).stem.lower()
     return TABLA_MAPEO.get(nombre_base, None)
 
 def leer_csv(filepath):
-    """Lee el archivo CSV y retorna headers y filas"""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -44,52 +34,34 @@ def leer_csv(filepath):
     except Exception as e:
         return None, f"Error al leer CSV: {str(e)}"
 
+def _formatear_valor(col, valor):
+    if valor is None or valor == '':
+        return 'NULL'
+    col_lower = col.lower()
+    # IDs y columnas de texto siempre entre comillas
+    if col_lower.startswith('id') or col_lower in COLUMNAS_TEXTO or 'desc' in col_lower or 'nombre' in col_lower:
+        return "'" + str(valor).replace("'", "\\'") + "'"
+    # Valores enteros sin comillas (activo, enviado, flags, etc.)
+    try:
+        int_val = int(valor)
+        if str(int_val) == str(valor).strip():
+            return str(int_val)
+    except (ValueError, TypeError):
+        pass
+    return "'" + str(valor).replace("'", "\\'") + "'"
+
 def generar_insert(tabla, headers, fila):
-    """Genera un INSERT SQL para una fila"""
-    
-    # Columnas del CSV
-    columnas = COLUMNAS_CSV.get(tabla, headers)
-    
-    # Valores del CSV
-    valores_csv = {}
-    for col in columnas:
-        if col in fila:
-            valores_csv[col] = fila[col]
-    
-    # Generar timestamp actual
     ahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    # Construir lista de columnas y valores
-    todas_columnas = []
-    todos_valores = []
-    
-    # Agregar columnas del CSV
-    for col in columnas:
-        if col in valores_csv:
-            todas_columnas.append(col)
-            valor = valores_csv[col]
-            
-            # Escapar valor
-            if valor is None or valor == '':
-                todos_valores.append('NULL')
-            elif col in ['activo', 'enviado']:
-                todos_valores.append(str(valor))
-            else:
-                # Escapar comillas simples
-                valor_escapado = str(valor).replace("'", "\\'")
-                todos_valores.append(f"'{valor_escapado}'")
-    
-    # Agregar columnas del sistema
-    todas_columnas.extend(['id', 'created_by_id', 'updated_by_id', 'created_at', 'updated_at'])
-    todos_valores.extend(['UUID()', '184', '184', f"'{ahora}'", f"'{ahora}'"])
-    
-    # Construir INSERT
-    columnas_str = ', '.join(todas_columnas)
-    valores_str = ', '.join(todos_valores)
-    
-    insert = f"INSERT INTO {tabla} ({columnas_str}) VALUES ({valores_str});"
-    
-    return insert
+
+    # Usar TODOS los headers del CSV tal como vienen
+    columnas = list(headers)
+    valores = [_formatear_valor(col, fila.get(col, '')) for col in columnas]
+
+    # Columnas del sistema al final
+    columnas += ['id', 'created_by_id', 'updated_by_id', 'created_at', 'updated_at']
+    valores += ['UUID()', '184', '184', f"'{ahora}'", f"'{ahora}'"]
+
+    return f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({', '.join(valores)});"
 
 def procesar_archivos(filepaths):
     """Procesa múltiples archivos y genera los INSERTs"""
@@ -184,6 +156,7 @@ window = sg.Window(
 # Variables globales
 archivos_seleccionados = []
 inserts_generados = []
+ultimo_output = ""
 
 # --- LOOP PRINCIPAL ---
 while True:
@@ -204,7 +177,7 @@ while True:
         if not archivos_seleccionados:
             sg.popup_error('Selecciona archivos CSV primero')
             continue
-        
+
         window['-STATUS-'].update('Procesando...')
         window.refresh()
         
@@ -235,11 +208,12 @@ while True:
             
             output = f"-- TOTAL: {total_inserts} INSERT(s) generados\n\n" + output
         
+        ultimo_output = output
         window['-OUTPUT-'].update(output)
         window['-STATUS-'].update(f'✓ Procesado: {sum(item["cantidad"] for item in inserts_generados)} registros')
     
     if event == 'Copiar al Portapapeles':
-        texto = window['-OUTPUT-'].get()
+        texto = ultimo_output
         if texto:
             window.TKroot.clipboard_clear()
             window.TKroot.clipboard_append(texto)
@@ -248,7 +222,7 @@ while True:
             sg.popup_error('No hay contenido para copiar')
     
     if event == 'Guardar en Archivo':
-        texto = window['-OUTPUT-'].get()
+        texto = ultimo_output
         if not texto:
             sg.popup_error('No hay contenido para guardar')
             continue
